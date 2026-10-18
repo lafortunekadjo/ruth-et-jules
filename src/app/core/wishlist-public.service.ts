@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { environment } from '../../environments/environment';
 import { WishlistItem } from './models/admin.models';
 
 /** Corps envoyé au backend pour réserver un cadeau ou participer. */
@@ -14,7 +13,8 @@ export interface ReservationCadeauRequest {
 @Injectable({ providedIn: 'root' })
 export class WishlistPublicService {
   private http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/public/mariages`;
+  /** Chemin relatif : Vercel relaie /api vers le VPS en production ; proxy Angular en local. */
+  private readonly base = '/api/public/mariages';
 
   lister(slug: string): Observable<WishlistItem[]> {
     return this.http.get<WishlistItem[]>(`${this.base}/${encodeURIComponent(slug)}/wishlist`);
