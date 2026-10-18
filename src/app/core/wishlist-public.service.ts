@@ -14,7 +14,7 @@ export interface ReservationCadeauRequest {
 export class WishlistPublicService {
   private http = inject(HttpClient);
   /** Chemin relatif : Vercel relaie /api vers le VPS en production ; proxy Angular en local. */
-  private readonly base = '/api/public/mariages';
+  private readonly base = '/api/public/mariages'; 
 
   lister(slug: string): Observable<WishlistItem[]> {
     return this.http.get<WishlistItem[]>(`${this.base}/${encodeURIComponent(slug)}/wishlist`);
