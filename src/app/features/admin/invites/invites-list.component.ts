@@ -29,8 +29,9 @@ type Filtre = 'tous' | 'confirmes' | 'attente' | 'declines';
         } @else {
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Ajouter un invité
         }
-          <app-import-invites (importe)="charger()" />
+          
       </button>
+      <app-import-invites (importe)="charger()" />
     </header>
 
     <!-- Statistiques -->
