@@ -4,13 +4,14 @@ import { InviteAdminService } from '../../../core/invite-admin.service';
 import { CreerInviteRequest, InviteAdmin, TypePlace } from '../../../core/models/admin.models';
 import { AdminThemeService } from '../../../shared/admin/admin-theme.service';
 import { SignatureStudioComponent } from '../../../shared/admin/signature-studio.component';
+import { ImportInvitesComponent } from './import-invites.component';
 
 type Filtre = 'tous' | 'confirmes' | 'attente' | 'declines';
 
 @Component({
   selector: 'app-invites-list',
   standalone: true,
-  imports: [FormsModule, SignatureStudioComponent],
+  imports: [FormsModule, SignatureStudioComponent, ImportInvitesComponent],
   styleUrls: ['../../../shared/admin/admin-commun.css'],
   template: `
     <header class="entete">
@@ -28,6 +29,7 @@ type Filtre = 'tous' | 'confirmes' | 'attente' | 'declines';
         } @else {
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Ajouter un invité
         }
+          <app-import-invites (importe)="charger()" />
       </button>
     </header>
 
