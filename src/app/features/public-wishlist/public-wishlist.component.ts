@@ -120,6 +120,14 @@ const LIBELLE_MOYEN: Record<MoyenPaiement, string> = {
                   }
                 </span>
                 <h2>{{ item.nom }}</h2>
+                @if (item.prix) { <p class="souhait-prix">{{ formaterPrix(item.prix) }}</p> }
+                @if (lienSur(item.lien); as url) {
+                  <a class="souhait-lien" [href]="url" target="_blank" rel="noopener noreferrer"
+                     [attr.aria-label]="'Voir ' + item.nom + ' sur ' + domaine(url) + ' (nouvel onglet)'">
+                    {{ domaine(url) }}
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+                  </a>
+                }
                 @if (quantite(item) > 1 && !estComplet(item)) {
                   <p class="souhait-quantite">{{ quantite(item) - nb(item) }} / {{ quantite(item) }} à offrir</p>
                 }
@@ -209,6 +217,12 @@ const LIBELLE_MOYEN: Record<MoyenPaiement, string> = {
               <p class="surtitre">Vous offrez</p>
               <h2 id="titre-reservation">{{ item.nom }}</h2>
               @if (item.prix) { <p class="resume-prix">{{ formaterPrix(item.prix) }}</p> }
+              @if (lienSur(item.lien); as url) {
+                <a class="souhait-lien resume-lien" [href]="url" target="_blank" rel="noopener noreferrer">
+                  Voir sur {{ domaine(url) }}
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+                </a>
+              }
             </div>
           </div>
 
@@ -308,6 +322,23 @@ const LIBELLE_MOYEN: Record<MoyenPaiement, string> = {
       font-family: var(--affichage); font-weight: 500; font-size: 1.15rem; line-height: 1.2;
       overflow-wrap: anywhere;
     }
+    .souhait-prix {
+      margin-top: .35rem;
+      font-family: var(--affichage); font-size: 1.05rem; font-weight: 500;
+      color: var(--couleur-secondaire); font-variant-numeric: lining-nums;
+    }
+    .souhait-lien {
+      display: inline-flex; align-items: center; gap: .3rem;
+      margin-top: .3rem; min-height: 32px; padding: 0 .2rem; max-width: 100%;
+      font-family: var(--texte); font-size: .62rem; letter-spacing: .08em;
+      color: var(--couleur-primaire); text-decoration: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--couleur-primaire) 35%, transparent);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .souhait-lien:hover, .souhait-lien:focus-visible { border-bottom-color: var(--couleur-primaire); }
+    .souhait-lien svg { flex: none; width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .souhait--offert .souhait-prix, .souhait--offert .souhait-lien { opacity: .5; }
+    .resume-lien { margin-top: .35rem; font-size: .7rem; }
     .souhait-quantite { margin-top: .25rem; font-size: .56rem; letter-spacing: .18em; text-transform: uppercase; color: var(--couleur-primaire); }
     .lien-offrir {
       margin-top: .8rem; min-height: 40px; padding: 0 1.1rem;
@@ -575,6 +606,26 @@ export class PublicWishlistComponent implements OnInit {
 
   numero(i: number): string {
     return String(i + 1).padStart(2, '0');
+  }
+
+  /**
+   * Lien du produit, seulement s'il est sûr à ouvrir (http/https).
+   * « jumia.cm/... » saisi sans protocole est complété en https://.
+   */
+  lienSur(lien: string | null | undefined): string | null {
+    const brut = (lien ?? '').trim();
+    if (!brut) return null;
+    try {
+      const url = new URL(/^https?:\/\//i.test(brut) ? brut : `https://${brut}`);
+      return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** « https://www.jumia.cm/produit… » → « jumia.cm » */
+  domaine(url: string): string {
+    try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'le site'; }
   }
 
   formaterPrix(prix: number | string): string {
