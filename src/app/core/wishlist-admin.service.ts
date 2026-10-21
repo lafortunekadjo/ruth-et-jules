@@ -18,4 +18,13 @@ export class WishlistAdminService {
   supprimer(id: string): Observable<void> {
     return this.http.delete<void>(`/api/admin/wishlist/${id}`);
   }
+
+  supprimerReservation(reservationId: string): Observable<void> {
+  return this.http.delete<void>(`/admin/wishlist/reservations/${reservationId}`);
+}
+
+modifier(id: string, item: Partial<WishlistItemAdmin>): Observable<void> {
+  return this.http.put<void>(`/admin/wishlist/${id}`, item);
+}
+
 }

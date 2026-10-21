@@ -90,6 +90,7 @@ interface TableAvecInvites extends TableItem {
               <span class="poignee" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>
               <span class="avatar" aria-hidden="true">{{ initiales(invite) }}</span>
               <span class="nom-invite">{{ invite.prenom }} {{ invite.nom }}</span>
+              @if (placesDe(invite) === 2) { <span class="places-x2" title="Couple : 2 places">×2</span> }
               <select class="deplacer" title="Déplacer vers…" aria-label="Déplacer vers…"
                       (mousedown)="$event.stopPropagation()" (touchstart)="$event.stopPropagation()"
                       (change)="deplacerVers(invite, $any($event.target).value)">
@@ -108,7 +109,7 @@ interface TableAvecInvites extends TableItem {
 
       <!-- Une colonne par table -->
       @for (table of tables; track table.id; let n = $index) {
-        <section class="colonne" [class.complete]="table.invites.length >= table.capacite">
+        <section class="colonne" [class.complete]="placesTable(table) >= table.capacite" [class.depasse]="placesTable(table) > table.capacite">
           <header class="col-entete">
             <span class="icone-table" aria-hidden="true">
               <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><circle cx="12" cy="3.6" r="1.6"/><circle cx="12" cy="20.4" r="1.6"/><circle cx="3.6" cy="12" r="1.6"/><circle cx="20.4" cy="12" r="1.6"/><circle cx="6.1" cy="6.1" r="1.4"/><circle cx="17.9" cy="17.9" r="1.4"/><circle cx="17.9" cy="6.1" r="1.4"/><circle cx="6.1" cy="17.9" r="1.4"/></svg>
@@ -116,8 +117,9 @@ interface TableAvecInvites extends TableItem {
             <div class="col-titre">
               <h2>{{ table.nom }}</h2>
               <p>
-                <strong>{{ table.invites.length }}</strong> / {{ table.capacite }} places
-                @if (table.invites.length >= table.capacite) { <span class="badge badge-accent badge-sans-point">Complète</span> }
+                <strong>{{ placesTable(table) }}</strong> / {{ table.capacite }} places
+                @if (placesTable(table) > table.capacite) { <span class="badge badge-danger badge-sans-point">Dépassée</span> }
+                @else if (placesTable(table) === table.capacite) { <span class="badge badge-accent badge-sans-point">Complète</span> }
               </p>
             </div>
             @if (aSupprimer() === table.id) {
@@ -142,6 +144,7 @@ interface TableAvecInvites extends TableItem {
                 <span class="poignee" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>
                 <span class="avatar" aria-hidden="true">{{ initiales(invite) }}</span>
                 <span class="nom-invite">{{ invite.prenom }} {{ invite.nom }}</span>
+                @if (placesDe(invite) === 2) { <span class="places-x2" title="Couple : 2 places">×2</span> }
                 <select class="deplacer" title="Déplacer vers…" aria-label="Déplacer vers…"
                         (mousedown)="$event.stopPropagation()" (touchstart)="$event.stopPropagation()"
                         (change)="deplacerVers(invite, $any($event.target).value)">
@@ -163,6 +166,12 @@ interface TableAvecInvites extends TableItem {
     <app-signature-studio />
   `,
   styles: [`
+    .places-x2 {
+      flex: none; padding: .05rem .4rem; border-radius: 999px;
+      font-size: .66rem; font-weight: 700; letter-spacing: .04em;
+      color: var(--a-primaire, #5e86ae); background: color-mix(in srgb, var(--a-primaire, #5e86ae) 12%, #fff);
+    }
+    .colonne.depasse .jauge span { background: var(--a-danger, #b3402f); }
     /* Création de table */
     .creation { display: grid; grid-template-columns: 1fr auto; gap: .75rem; align-items: end; }
     .champ-nom { grid-column: 1 / -1; }
@@ -346,7 +355,22 @@ export class TablePlanComponent implements OnInit {
   }
 
   get places(): number {
-    return this.tables.reduce((n, t) => n + t.invites.length, 0);
+    return this.tables.reduce((n, t) => n + this.placesTable(t), 0);
+  }
+
+  /**
+   * Personnes occupées par une invitation à table :
+   * couple confirmé (ou couple qui n'a pas encore répondu) = 2, solo = 1, décliné = 0.
+   */
+  placesDe(i: InviteAdmin): number {
+    if (i.statutRsvp === 'DECLINE') return 0;
+    if (i.statutRsvp === 'CONFIRME_SOLO') return 1;
+    if (i.statutRsvp === 'CONFIRME_COUPLE') return 2;
+    return i.typePlace === 'COUPLE' ? 2 : 1;
+  }
+
+  placesTable(t: TableAvecInvites): number {
+    return t.invites.reduce((n, i) => n + this.placesDe(i), 0);
   }
 
   ngOnInit(): void {
@@ -481,7 +505,7 @@ export class TablePlanComponent implements OnInit {
   }
 
   taux(t: TableAvecInvites): number {
-    return t.capacite ? Math.min(100, (t.invites.length / t.capacite) * 100) : 0;
+    return t.capacite ? Math.min(100, (this.placesTable(t) / t.capacite) * 100) : 0;
   }
 
   private messageErreur(err: HttpErrorResponse): string {

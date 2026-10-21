@@ -1,5 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Observable } from 'rxjs';
 import { WishlistAdminService } from '../../../core/wishlist-admin.service';
 import { libelleTypeCadeau, MoyenPaiement, WishlistItemAdmin } from '../../../core/models/admin.models';
 import { AdminThemeService } from '../../../shared/admin/admin-theme.service';
@@ -33,7 +35,7 @@ const NOUVEAU = (): Partial<WishlistItemAdmin> => ({
         <h1>Liste de mariage</h1>
         <p class="sous-titre">Visible par vos invités sur la page publique.</p>
       </div>
-      <button type="button" class="btn" [class.btn-plein]="!formOuvert()" [class.btn-contour]="formOuvert()" (click)="formOuvert.set(!formOuvert())">
+      <button type="button" class="btn" [class.btn-plein]="!formOuvert()" [class.btn-contour]="formOuvert()" (click)="basculerFormulaire()">
         @if (formOuvert()) {
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg> Fermer
         } @else {
@@ -52,20 +54,23 @@ const NOUVEAU = (): Partial<WishlistItemAdmin> => ({
     }
 
     @if (formOuvert()) {
-      <form class="carte formulaire" (ngSubmit)="creer()">
-        <h2 class="carte-titre">Nouveau cadeau</h2>
+      <form class="carte formulaire" id="formulaire-cadeau" (ngSubmit)="enregistrer()">
+        <h2 class="carte-titre">{{ enEdition() ? 'Modifier « ' + nomEdite() + ' »' : 'Nouveau cadeau' }}</h2>
 
         <span class="label">Type de cadeau</span>
         <div class="segmente type" role="radiogroup">
-          <label><input type="radio" name="type" value="MATERIEL" [(ngModel)]="nouveau.type" /><span>
+          <label><input type="radio" name="type" value="MATERIEL" [(ngModel)]="nouveau.type" [disabled]="typeVerrouille()" /><span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7"/></svg> Un objet</span></label>
-          <label><input type="radio" name="type" value="MONETAIRE" [(ngModel)]="nouveau.type" /><span>
+          <label><input type="radio" name="type" value="MONETAIRE" [(ngModel)]="nouveau.type" [disabled]="typeVerrouille()" /><span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/></svg> Une participation</span></label>
         </div>
         <p class="aide-type">
+          @if (typeVerrouille()) { Le type ne peut plus changer : ce cadeau a déjà des réservations. }
+          @else {
           {{ estMonetaireForm()
               ? 'Vos invités peuvent participer autant de fois qu’ils le souhaitent, par Mobile Money ou virement.'
               : 'Chaque exemplaire ne peut être réservé qu’une fois. Indiquez combien vous en souhaitez.' }}
+          }
         </p>
 
         <div class="avec-apercu">
@@ -92,10 +97,11 @@ const NOUVEAU = (): Partial<WishlistItemAdmin> => ({
               <div>
                 <label for="w-qte">Quantité souhaitée</label>
                 <div class="compteur">
-                  <button type="button" (click)="nouveau.quantite = (nouveau.quantite ?? 1) > 1 ? (nouveau.quantite ?? 1) - 1 : 1" aria-label="Moins">−</button>
-                  <input id="w-qte" name="quantite" [(ngModel)]="nouveau.quantite" type="number" min="1" inputmode="numeric" />
+                  <button type="button" (click)="nouveau.quantite = (nouveau.quantite ?? 1) > quantiteMin() ? (nouveau.quantite ?? 1) - 1 : quantiteMin()" aria-label="Moins">−</button>
+                  <input id="w-qte" name="quantite" [(ngModel)]="nouveau.quantite" type="number" [min]="quantiteMin()" inputmode="numeric" />
                   <button type="button" (click)="nouveau.quantite = (nouveau.quantite ?? 1) + 1" aria-label="Plus">+</button>
                 </div>
+                @if (quantiteMin() > 1) { <p class="aide-champ">{{ quantiteMin() }} déjà réservé{{ quantiteMin() > 1 ? 's' : '' }} : pas moins.</p> }
               </div>
             } @else {
               <div>
@@ -127,9 +133,14 @@ const NOUVEAU = (): Partial<WishlistItemAdmin> => ({
             </div>
           </div>
         </div>
+        @if (erreurForm()) { <p class="bandeau-erreur" role="alert">{{ erreurForm() }}</p> }
         <div class="actions-form">
+          @if (enEdition()) {
+            <button type="button" class="btn btn-contour" (click)="fermerFormulaire()" [disabled]="enCours()">Annuler</button>
+          }
           <button type="submit" class="btn btn-plein" [disabled]="enCours() || !formulaireValide()">
-            @if (enCours()) { <span class="spinner"></span> Ajout… } @else { Ajouter à la liste }
+            @if (enCours()) { <span class="spinner"></span> Enregistrement… }
+            @else { {{ enEdition() ? 'Enregistrer les modifications' : 'Ajouter à la liste' }} }
           </button>
         </div>
       </form>
@@ -144,7 +155,7 @@ const NOUVEAU = (): Partial<WishlistItemAdmin> => ({
     } @else {
       <div class="grille">
         @for (item of items(); track item.id; let i = $index) {
-          <article class="cadeau apparition" [style.--i]="i < 12 ? i : 12" [class.complet]="estComplet(item)">
+          <article class="cadeau apparition" [style.--i]="i < 12 ? i : 12" [class.complet]="estComplet(item)" [class.edite]="enEdition() === item.id">
             <div class="haut">
               <div class="visuel">
                 @if (item.imageUrl) {
@@ -198,6 +209,16 @@ const NOUVEAU = (): Partial<WishlistItemAdmin> => ({
                         @if (!r.inviteId) { <span class="hors-liste" title="Ce nom ne correspond à aucun invité de votre liste">hors liste</span> }
                       </span>
                       @if (r.montant) { <span class="qui-montant">{{ formaterPrix(r.montant) }}</span> }
+                      @if (resaASupprimer() === r.id) {
+                        <button type="button" class="btn btn-danger qui-annuler qui-annuler--confirmer" (click)="annulerReservation(r.id)" [disabled]="annulation()">
+                          {{ annulation() ? '…' : 'Retirer ?' }}
+                        </button>
+                      } @else {
+                        <button type="button" class="qui-annuler" (click)="demanderAnnulation(r.id)"
+                                [attr.aria-label]="'Retirer la réservation de ' + r.nom" title="Retirer cette réservation">
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                        </button>
+                      }
                       <span class="qui-date">{{ formaterDate(r.creeLe) }}</span>
                     </li>
                   }
@@ -219,6 +240,9 @@ const NOUVEAU = (): Partial<WishlistItemAdmin> => ({
                     <svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
                   </a>
                 }
+                <button type="button" class="btn btn-icone" (click)="modifier(item)" [attr.aria-label]="'Modifier ' + item.nom" title="Modifier">
+                  <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4"/></svg>
+                </button>
                 @if (aSupprimer() === item.id) {
                   <button type="button" class="btn btn-danger confirmer" (click)="supprimer(item.id)">Supprimer ?</button>
                 } @else {
@@ -237,6 +261,9 @@ const NOUVEAU = (): Partial<WishlistItemAdmin> => ({
   `,
   styles: [`
     .valeur-prix { font-size: 1.55rem; padding-top: .25rem; }
+    .aide-champ { margin-top: .3rem; font-size: .72rem; color: var(--a-doux); }
+    .type input:disabled + span { opacity: .55; cursor: not-allowed; }
+    .cadeau.edite { border-color: var(--a-primaire); box-shadow: 0 0 0 3px color-mix(in srgb, var(--a-primaire) 18%, transparent); }
 
     .type { margin-bottom: .45rem; }
     .type span svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
@@ -295,7 +322,16 @@ const NOUVEAU = (): Partial<WishlistItemAdmin> => ({
     .qui summary::before { content: '›'; font-size: 1rem; transition: transform 150ms ease; }
     .qui[open] summary::before { transform: rotate(90deg); }
     .qui ul { display: flex; flex-direction: column; gap: .4rem; margin-top: .55rem; }
-    .qui li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: .55rem; font-size: .82rem; }
+    .qui li { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; column-gap: .55rem; font-size: .82rem; }
+    .qui li:not(:has(.qui-montant)) { grid-template-columns: auto 1fr auto; }
+    .qui-annuler {
+      display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border-radius: 50%;
+      border: 1px solid transparent; background: transparent; color: var(--a-pale); cursor: pointer;
+      transition: color .15s, background .15s, border-color .15s;
+    }
+    .qui-annuler svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+    .qui-annuler:hover, .qui-annuler:focus-visible { color: var(--a-danger); border-color: color-mix(in srgb, var(--a-danger) 35%, transparent); background: color-mix(in srgb, var(--a-danger) 6%, #fff); }
+    .qui-annuler--confirmer { width: auto; height: 28px; min-height: 0; padding: 0 .7rem; border-radius: 999px; font-size: .7rem; }
     .qui .avatar { width: 28px; height: 28px; font-size: .75rem; grid-row: span 2; }
     .qui-nom { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .hors-liste { margin-left: .3rem; padding: .05rem .4rem; border-radius: 999px; font-size: .6rem; font-weight: 600; color: var(--a-attente); background: var(--a-attente-bg); }
@@ -352,22 +388,74 @@ export class WishlistAdminComponent implements OnInit {
     this.wishlistAdminService.lister().subscribe(items => this.items.set(items));
   }
 
-  creer(): void {
+  // ── Ajout / modification (même formulaire) ──
+  /** Id du cadeau en cours de modification, null en création. */
+  readonly enEdition = signal<string | null>(null);
+  readonly nomEdite = signal('');
+  readonly erreurForm = signal('');
+  /** Réservations existantes du cadeau édité : bloquent le type et la quantité minimale. */
+  private nbReservationsEdite = 0;
+
+  typeVerrouille(): boolean { return !!this.enEdition() && this.nbReservationsEdite > 0; }
+  quantiteMin(): number { return Math.max(1, this.enEdition() ? this.nbReservationsEdite : 1); }
+
+  basculerFormulaire(): void {
+    if (this.formOuvert()) this.fermerFormulaire();
+    else { this.nouveau = NOUVEAU(); this.enEdition.set(null); this.erreurForm.set(''); this.formOuvert.set(true); }
+  }
+
+  fermerFormulaire(): void {
+    this.formOuvert.set(false);
+    this.enEdition.set(null);
+    this.erreurForm.set('');
+    this.nouveau = NOUVEAU();
+  }
+
+  /** Ouvre le formulaire pré-rempli avec le cadeau. */
+  modifier(item: WishlistItemAdmin): void {
+    this.nouveau = {
+      nom: item.nom, description: item.description ?? '', lien: item.lien ?? '', imageUrl: item.imageUrl ?? '',
+      prix: item.prix, type: item.type, quantite: item.quantite ?? 1,
+      moyenPaiement: item.moyenPaiement ?? 'MOBILE_MONEY', infosPaiement: item.infosPaiement ?? '',
+    };
+    this.nbReservationsEdite = this.nb(item);
+    this.enEdition.set(item.id);
+    this.nomEdite.set(item.nom);
+    this.erreurForm.set('');
+    this.formOuvert.set(true);
+    setTimeout(() => document.getElementById('formulaire-cadeau')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
+  enregistrer(): void {
     if (!this.formulaireValide()) return;
     this.enCours.set(true);
+    this.erreurForm.set('');
     const n = this.nouveau;
     const demande: Partial<WishlistItemAdmin> = n.type === 'MONETAIRE'
       ? { ...n, quantite: 1 }
       : { ...n, moyenPaiement: null, infosPaiement: null };
-      console.log(demande)
-    this.wishlistAdminService.creer(demande).subscribe({
+    const id = this.enEdition();
+    // creer() et modifier() ne renvoient pas forcément le même type : on ignore la valeur renvoyée
+    const appel: Observable<unknown> = id
+      ? this.wishlistAdminService.modifier(id, demande)
+      : this.wishlistAdminService.creer(demande);
+    appel.subscribe({
       next: () => {
         this.enCours.set(false);
-        this.nouveau = NOUVEAU();
+        this.fermerFormulaireApres(!!id);
         this.charger();
       },
-      error: () => this.enCours.set(false)
+      error: (e: HttpErrorResponse) => {
+        this.enCours.set(false);
+        this.erreurForm.set(e.error?.message ?? 'Enregistrement impossible. Réessayez.');
+      },
     });
+  }
+
+  /** Après un ajout on garde le formulaire ouvert (ajouts en série) ; après une modification on le ferme. */
+  private fermerFormulaireApres(modification: boolean): void {
+    if (modification) this.fermerFormulaire();
+    else this.nouveau = NOUVEAU();
   }
 
   demanderSuppression(id: string): void {
@@ -378,7 +466,28 @@ export class WishlistAdminComponent implements OnInit {
 
   supprimer(id: string): void {
     this.aSupprimer.set(null);
+    if (this.enEdition() === id) this.fermerFormulaire();
     this.wishlistAdminService.supprimer(id).subscribe(() => this.charger());
+  }
+
+  // ── Retrait d'une réservation (erreur d'un invité, désistement, doublon…) ──
+  readonly resaASupprimer = signal<string | null>(null);
+  readonly annulation = signal(false);
+  private minuteurResa?: ReturnType<typeof setTimeout>;
+
+  /** 1er clic → « Retirer ? » pendant 3,5 s, 2e clic → retrait. */
+  demanderAnnulation(reservationId: string): void {
+    this.resaASupprimer.set(reservationId);
+    clearTimeout(this.minuteurResa);
+    this.minuteurResa = setTimeout(() => this.resaASupprimer.set(null), 3500);
+  }
+
+  annulerReservation(reservationId: string): void {
+    this.annulation.set(true);
+    this.wishlistAdminService.supprimerReservation(reservationId).subscribe({
+      next: () => { this.annulation.set(false); this.resaASupprimer.set(null); this.charger(); },
+      error: () => { this.annulation.set(false); this.resaASupprimer.set(null); this.charger(); },
+    });
   }
 
   // ── Aides d'affichage ──
@@ -387,7 +496,7 @@ export class WishlistAdminComponent implements OnInit {
   formulaireValide(): boolean {
     if (!this.nouveau.nom?.trim()) return false;
     if (this.estMonetaireForm()) return !!this.nouveau.infosPaiement?.trim();
-    return (this.nouveau.quantite ?? 0) >= 1;
+    return (this.nouveau.quantite ?? 0) >= this.quantiteMin();
   }
 
   estMonetaire(i: WishlistItemAdmin): boolean { return i.type === 'MONETAIRE'; }
@@ -397,7 +506,8 @@ export class WishlistAdminComponent implements OnInit {
   quantite(i: WishlistItemAdmin): number { return Math.max(1, i.quantite ?? 1); }
   taux(i: WishlistItemAdmin): number { return Math.min(100, (this.nb(i) / this.quantite(i)) * 100); }
   libelleMoyen(m: MoyenPaiement): string { return LIBELLE_MOYEN[m] ?? m; }
- readonly libelleTypeCadeau = libelleTypeCadeau;
+  readonly libelleTypeCadeau = libelleTypeCadeau;
+
   initiales(nom: string): string {
     return nom.trim().split(/\s+/).slice(0, 2).map(p => p.charAt(0).toUpperCase()).join('');
   }

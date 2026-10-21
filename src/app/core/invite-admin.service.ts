@@ -14,4 +14,8 @@ export class InviteAdminService {
   creer(req: CreerInviteRequest): Observable<InviteAdmin> {
     return this.http.post<InviteAdmin>('/api/admin/invites', req);
   }
+
+  supprimer(id: string): Observable<void> {
+  return this.http.delete<void>(`/admin/invites/${id}`);
+}
 }

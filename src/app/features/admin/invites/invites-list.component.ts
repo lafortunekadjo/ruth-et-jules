@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { InviteAdminService } from '../../../core/invite-admin.service';
 import { CreerInviteRequest, InviteAdmin, TypePlace } from '../../../core/models/admin.models';
 import { AdminThemeService } from '../../../shared/admin/admin-theme.service';
@@ -29,10 +30,13 @@ type Filtre = 'tous' | 'confirmes' | 'attente' | 'declines';
         } @else {
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Ajouter un invité
         }
-          
       </button>
-      <app-import-invites (importe)="charger()" />
     </header>
+
+    <!-- Import Excel : bouton + panneau (modèle à télécharger, dépôt du fichier, bilan) -->
+    <div class="zone-import">
+      <app-import-invites (importe)="charger()" />
+    </div>
 
     <!-- Statistiques -->
     <section class="stats" aria-label="Résumé des réponses">
@@ -67,6 +71,8 @@ type Filtre = 'tous' | 'confirmes' | 'attente' | 'declines';
         <p>{{ round(pourcent(stats().confirmes + stats().declines)) }} % ont répondu</p>
       </div>
     }
+
+    @if (erreurSuppression()) { <p class="bandeau-erreur" role="alert">{{ erreurSuppression() }}</p> }
 
     <!-- Ajout -->
     @if (formOuvert()) {
@@ -133,7 +139,7 @@ type Filtre = 'tous' | 'confirmes' | 'attente' | 'declines';
       <div class="carte tableau">
         <table>
           <thead>
-            <tr><th>Invité</th><th>Invitation</th><th>Réponse</th><th>Conjoint·e</th><th>Table</th><th>Cadeau</th></tr>
+            <tr><th>Invité</th><th>Invitation</th><th>Réponse</th><th>Conjoint·e</th><th>Table</th><th>Cadeau</th><th><span class="sr-only">Actions</span></th></tr>
           </thead>
           <tbody>
             @for (invite of invitesFiltres(); track invite.id; let i = $index) {
@@ -174,10 +180,24 @@ type Filtre = 'tous' | 'confirmes' | 'attente' | 'declines';
                     </span>
                   } @else { — }
                 </td>
+                <td class="col-actions">
+                  @if (!estConfirme(invite)) {
+                    @if (aSupprimer() === invite.id) {
+                      <button type="button" class="btn btn-danger btn-mini" (click)="supprimer(invite)" [disabled]="suppression()">
+                        @if (suppression()) { <span class="spinner"></span> } @else { Supprimer ? }
+                      </button>
+                    } @else {
+                      <button type="button" class="btn btn-icone" (click)="demanderSuppression(invite.id)"
+                              [attr.aria-label]="'Supprimer ' + invite.prenom + ' ' + invite.nom" title="Supprimer l'invité">
+                        <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"/></svg>
+                      </button>
+                    }
+                  }
+                </td>
               </tr>
             }
             @if (invitesFiltres().length === 0) {
-              <tr><td colspan="6" class="aucun">Aucun invité ne correspond à cette recherche.</td></tr>
+              <tr><td colspan="7" class="aucun">Aucun invité ne correspond à cette recherche.</td></tr>
             }
           </tbody>
         </table>
@@ -187,6 +207,7 @@ type Filtre = 'tous' | 'confirmes' | 'attente' | 'declines';
     <app-signature-studio />
   `,
   styles: [`
+    .zone-import { display: grid; justify-items: start; margin: -.4rem 0 1.25rem; }
     .stat--large { grid-column: 1 / -1; }
     @media (min-width: 720px) {
       :host .stats { grid-template-columns: repeat(5, 1fr); }
@@ -224,6 +245,10 @@ type Filtre = 'tous' | 'confirmes' | 'attente' | 'declines';
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .cadeau-puce svg { flex: none; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .col-actions { grid-column: 1 / -1; justify-content: flex-end; }
+    .col-actions:empty { display: none; }
+    .btn-mini { min-height: 34px; padding: 0 .8rem; font-size: .75rem; }
     .aucun { display: block; padding: 1.5rem 0; text-align: center; color: var(--a-doux); font-style: italic; }
 
     @media (min-width: 820px) {
@@ -243,6 +268,8 @@ type Filtre = 'tous' | 'confirmes' | 'attente' | 'declines';
       tbody tr { transition: background 150ms ease; }
       tbody tr:hover { background: color-mix(in srgb, var(--a-sable) 7%, #fff); }
       .aucun { display: table-cell; }
+      .col-actions { width: 1%; white-space: nowrap; text-align: right; }
+      .col-actions:empty { display: table-cell; }
     }
   `]
 })
@@ -291,6 +318,36 @@ export class InvitesListComponent implements OnInit {
 
   charger(): void {
     this.inviteAdminService.lister().subscribe(invites => this.invites.set(invites));
+  }
+
+  // ── Suppression (seulement si l'invité n'a pas confirmé : pas encore de billet) ──
+  readonly aSupprimer = signal<string | null>(null);
+  readonly suppression = signal(false);
+  readonly erreurSuppression = signal('');
+  private minuteurSuppression?: ReturnType<typeof setTimeout>;
+
+  /** 1er clic → « Supprimer ? » pendant 3,5 s, 2e clic → suppression. */
+  demanderSuppression(id: string): void {
+    this.erreurSuppression.set('');
+    this.aSupprimer.set(id);
+    clearTimeout(this.minuteurSuppression);
+    this.minuteurSuppression = setTimeout(() => this.aSupprimer.set(null), 3500);
+  }
+
+  supprimer(invite: InviteAdmin): void {
+    this.suppression.set(true);
+    this.inviteAdminService.supprimer(invite.id).subscribe({
+      next: () => {
+        this.suppression.set(false);
+        this.aSupprimer.set(null);
+        this.invites.update(l => l.filter(i => i.id !== invite.id));
+      },
+      error: (e: HttpErrorResponse) => {
+        this.suppression.set(false);
+        this.aSupprimer.set(null);
+        this.erreurSuppression.set(e.error?.message ?? 'Suppression impossible. Réessayez.');
+      },
+    });
   }
 
   creer(): void {
