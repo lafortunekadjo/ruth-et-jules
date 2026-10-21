@@ -16,6 +16,6 @@ export class InviteAdminService {
   }
 
   supprimer(id: string): Observable<void> {
-  return this.http.delete<void>(`/admin/invites/${id}`);
+  return this.http.delete<void>(`/api/admin/invites/${id}`);
 }
 }
