@@ -2,6 +2,8 @@ import { Component, DestroyRef, ElementRef, HostListener, OnInit, PLATFORM_ID, c
 import { CommonModule, DOCUMENT, isPlatformBrowser } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MariagePublic, MariagePublicService } from '../../core/mariage-public.service';
+import { MusiqueService } from '../../shared/musique.service';
+
 
 type EtatEnveloppe = 'fermee' | 'ouverture' | 'fondu' | 'ouverte';
 
@@ -195,23 +197,6 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
         [style.--police-affichage]="m.police ? m.police + ', Cormorant Garamond, Georgia, serif' : null"
       >
 
-        <!-- ============ Musique : bouton flottant ============ -->
-        @if (musiqueDispo) {
-          <button type="button" class="musique" [class.musique--joue]="musiqueJoue()"
-                  [class.musique--appel]="!musiqueJoue() && etat() === 'ouverte' && !musiqueCoupee()"
-                  (click)="basculerMusique()"
-                  [attr.aria-label]="musiqueJoue() ? 'Couper la musique' : 'Écouter la musique'"
-                  [attr.aria-pressed]="musiqueJoue()">
-            @if (musiqueJoue()) {
-              <span class="musique-barres" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-            } @else {
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>
-                @if (musiqueCoupee()) { <path class="barre-coupe" d="M3 3l18 18"/> }
-              </svg>
-            }
-          </button>
-        }
 
         <!-- ============ Enveloppe (écran d'accueil) ============ -->
         @if (etat() !== 'ouverte') {
@@ -221,7 +206,7 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
             </div>
 
             <p class="eyebrow">Save the date · {{ annee(m) }}</p>
-            <p class="monogramme-titre"></p>
+            <p class="monogramme-titre">{{ monogramme(m) }}</p>
 
             <button type="button" class="enveloppe" (click)="ouvrir()" [disabled]="etat() !== 'fermee'"
                     aria-label="Ouvrir l'invitation">
@@ -838,41 +823,6 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
     .anim { animation: monter 900ms cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--d) * 140ms + 100ms); }
     @keyframes monter { from { opacity: 0; transform: translateY(18px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
     @keyframes fondu { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-
-    /* ---------- Musique ---------- */
-    .musique {
-      position: fixed; z-index: 70;
-      top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right));
-      width: 46px; height: 46px; border-radius: 50%; padding: 0;
-      display: grid; place-items: center; cursor: pointer;
-      border: 1px solid color-mix(in srgb, var(--couleur-tertiaire) 70%, transparent);
-      background: color-mix(in srgb, var(--couleur-fond) 82%, transparent);
-      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-      color: var(--couleur-primaire);
-      box-shadow: 0 8px 22px -12px rgba(34, 50, 74, .55);
-      transition: transform .2s ease, background .2s ease;
-    }
-    .musique:active { transform: scale(.94); }
-    .musique svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-    .musique .barre-coupe { stroke: var(--couleur-secondaire); }
-    .musique--joue { background: var(--couleur-primaire); border-color: var(--couleur-primaire); color: #fff; }
-    /* invitation ouverte sans son : une onde douce invite à toucher */
-    .musique--appel::after {
-      content: ''; position: absolute; inset: -1px; border-radius: 50%;
-      border: 1px solid var(--couleur-tertiaire);
-      animation: musique-onde 2.4s ease-out infinite;
-    }
-    @keyframes musique-onde { to { transform: scale(1.7); opacity: 0; } }
-    .musique-barres { display: flex; align-items: flex-end; gap: 3px; height: 16px; }
-    .musique-barres i { display: block; width: 3px; height: 100%; border-radius: 2px; background: currentColor; transform-origin: bottom; animation: musique-barre 1s ease-in-out infinite alternate; }
-    .musique-barres i:nth-child(2) { animation-delay: -.4s; animation-duration: .8s; }
-    .musique-barres i:nth-child(3) { animation-delay: -.7s; animation-duration: 1.15s; }
-    .musique-barres i:nth-child(4) { animation-delay: -.2s; animation-duration: .9s; }
-    @keyframes musique-barre { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
-    @media (prefers-reduced-motion: reduce) {
-      .musique-barres i, .musique--appel::after { animation: none; }
-      .musique-barres i { transform: scaleY(.7); }
-    }
 
     /* ---------- Écran enveloppe ---------- */
     /* Chronologie : cachet (0,4 s) → rabat (0,35–1,25 s) → lettre qui sort (1,15–2,45 s)
@@ -2012,107 +1962,12 @@ export class SaveTheDateComponent implements OnInit {
     if (isPlatformBrowser(this.platformId)) {
       const id = setInterval(() => this.maintenant.set(Date.now()), 1000);
       this.destroyRef.onDestroy(() => { clearInterval(id); this.minuteurs.forEach(clearTimeout); this.observer?.disconnect(); });
-      this.preparerMusique();
+      if (MUSIQUE) this.musique.configurer(MUSIQUE.src, MUSIQUE.volume);
     }
   }
 
-  // ═══════════════ Musique de fond ═══════════════
-
-  readonly musiqueDispo = !!MUSIQUE;
-  readonly musiqueJoue = signal(false);
-  /** L'invité a coupé le son : on respecte son choix pendant toute la visite. */
-  readonly musiqueCoupee = signal(false);
-  private audio?: HTMLAudioElement;
-  private fondu?: ReturnType<typeof setInterval>;
-  private repriseApresMasquage = false;
-  private static readonly CLE_MUSIQUE = 'musique-invitation';
-
-  private preparerMusique(): void {
-    if (!MUSIQUE) return;
-    let choix: string | null = null;
-    try { choix = sessionStorage.getItem(SaveTheDateComponent.CLE_MUSIQUE); } catch { /* indisponible */ }
-    this.musiqueCoupee.set(choix === 'coupee');
-
-    // Retour sur la page (enveloppe déjà ouverte) avec la musique qui tournait :
-    // on la relance au premier toucher, puisque le navigateur bloque le son avant.
-    if (choix === 'joue' && this.etat() === 'ouverte') {
-      const relancer = () => {
-        if (!this.musiqueCoupee() && !this.musiqueJoue()) this.jouerMusique();
-      };
-      this.document.addEventListener('pointerdown', relancer, { once: true, capture: true });
-      this.destroyRef.onDestroy(() => this.document.removeEventListener('pointerdown', relancer, { capture: true }));
-    }
-
-    // Écran verrouillé / autre onglet : on met en pause, puis on reprend.
-    const visibilite = () => {
-      if (!this.audio) return;
-      if (this.document.hidden) {
-        this.repriseApresMasquage = this.musiqueJoue();
-        if (this.musiqueJoue()) this.audio.pause();
-      } else if (this.repriseApresMasquage) {
-        this.audio.play().catch(() => this.musiqueJoue.set(false));
-      }
-    };
-    this.document.addEventListener('visibilitychange', visibilite);
-
-    this.destroyRef.onDestroy(() => {
-      this.document.removeEventListener('visibilitychange', visibilite);
-      clearInterval(this.fondu);
-      if (this.audio) { this.audio.pause(); this.audio.src = ''; }
-    });
-  }
-
-  basculerMusique(): void {
-    if (this.musiqueJoue()) {
-      this.couperMusique();
-    } else {
-      this.musiqueCoupee.set(false);
-      this.jouerMusique();
-    }
-  }
-
-  private jouerMusique(): void {
-    if (!MUSIQUE || !isPlatformBrowser(this.platformId)) return;
-    if (!this.audio) {
-      this.audio = new Audio(MUSIQUE.src);
-      this.audio.loop = true;
-      this.audio.preload = 'auto';
-      this.audio.addEventListener('pause', () => { if (!this.document.hidden) this.musiqueJoue.set(false); });
-      this.audio.addEventListener('playing', () => this.musiqueJoue.set(true));
-    }
-    this.audio.volume = 0;
-    // play() doit être appelé directement dans le geste (exigence iOS / Chrome)
-    this.audio.play()
-      .then(() => {
-        this.memoriserChoixMusique('joue');
-        this.fondreVolume(MUSIQUE.volume, 2500);
-      })
-      .catch(() => this.musiqueJoue.set(false));   // fichier absent ou son bloqué : le bouton reste là
-  }
-
-  private couperMusique(): void {
-    this.musiqueCoupee.set(true);
-    this.memoriserChoixMusique('coupee');
-    this.fondreVolume(0, 500, () => this.audio?.pause());
-  }
-
-  /** Fondu de volume (iOS ignore `volume` : le son y démarre/s'arrête simplement sans fondu). */
-  private fondreVolume(cible: number, duree: number, fin?: () => void): void {
-    const a = this.audio;
-    if (!a) return;
-    clearInterval(this.fondu);
-    const depart = a.volume;
-    const t0 = performance.now();
-    this.fondu = setInterval(() => {
-      const p = Math.min(1, (performance.now() - t0) / duree);
-      a.volume = Math.max(0, Math.min(1, depart + (cible - depart) * p));
-      if (p >= 1) { clearInterval(this.fondu); fin?.(); }
-    }, 50);
-  }
-
-  private memoriserChoixMusique(choix: 'joue' | 'coupee'): void {
-    try { sessionStorage.setItem(SaveTheDateComponent.CLE_MUSIQUE, choix); } catch { /* indisponible */ }
-  }
+  // ═══════════════ Musique de fond (service partagé : elle continue sur les autres pages) ═══════════════
+  private readonly musique = inject(MusiqueService);
 
   private minuteurs: ReturnType<typeof setTimeout>[] = [];
 
@@ -2120,7 +1975,7 @@ export class SaveTheDateComponent implements OnInit {
   ouvrir(): void {
     if (this.etat() !== 'fermee') return;
     // Le toucher sur le cachet est le geste qui autorise le son : la musique part ici.
-    if (!this.musiqueCoupee()) this.jouerMusique();
+    this.musique.jouerSiAutorise();
     this.etat.set('ouverture');
     this.minuteurs.push(setTimeout(() => this.passer(), 5600));
   }
