@@ -33,7 +33,7 @@ export class PhotosPublicService {
   private httpExterne = new HttpClient(inject(HttpBackend));
 
   lister(slug: string): Observable<PhotoItem[]> {
-    return this.http.get<PhotoItem[]>(`/api/public/photos`);
+    return this.http.get<PhotoItem[]>(`/api/public/mariages/${slug}/photos`);
   }
 
 
