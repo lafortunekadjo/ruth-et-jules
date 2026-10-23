@@ -19,10 +19,24 @@ import { AuthService } from '../../core/auth.service';
             Email
             <input class="champ" type="email" name="email" [(ngModel)]="email" required autocomplete="username" />
           </label>
-          <label>
+          <label for="mdp">
             Mot de passe
-            <input class="champ" type="password" name="motDePasse" [(ngModel)]="motDePasse" required autocomplete="current-password" />
           </label>
+          <div class="champ-mdp">
+            <input id="mdp" class="champ" name="motDePasse" [(ngModel)]="motDePasse"
+                   [type]="mdpVisible() ? 'text' : 'password'"
+                   autocomplete="current-password" required />
+            <button type="button" class="voir-mdp" (click)="mdpVisible.set(!mdpVisible())"
+                    [attr.aria-label]="mdpVisible() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+                    [attr.aria-pressed]="mdpVisible()">
+              @if (mdpVisible()) {
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.9 8.4 2 12 2 12s4 7 10 7c1.8 0 3.4-.5 4.8-1.3M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+              } @else {
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              }
+            </button>
+          </div>
+
 
           @if (erreur()) {
             <p class="erreur-texte">{{ erreur() }}</p>
@@ -162,6 +176,23 @@ import { AuthService } from '../../core/auth.service';
     cursor: not-allowed;
   }
 
+  /* Le libellé « Mot de passe » est séparé du champ (le bouton œil doit être dans le champ) */
+  label[for="mdp"] { margin-bottom: -0.85rem; }
+
+  /* Champ mot de passe + bouton œil */
+  .champ-mdp { position: relative; }
+  .champ-mdp .champ { padding-right: 3rem; }
+  .voir-mdp {
+    position: absolute; top: 50%; right: 0.35rem; transform: translateY(-50%);
+    width: 40px; height: 40px; padding: 0;
+    display: grid; place-items: center;
+    border: none; border-radius: 50%;
+    background: transparent; color: var(--text-muted); cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .voir-mdp:hover, .voir-mdp:focus-visible { color: var(--text-main); background: rgba(0, 0, 0, 0.05); outline: none; }
+  .voir-mdp svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
   .erreur-texte {
     padding: 0.75rem 0.9rem;
     border-radius: 8px;
@@ -192,6 +223,8 @@ export class LoginComponent {
   motDePasse = '';
   enCours = signal(false);
   erreur = signal<string | null>(null);
+  /** Affiche le mot de passe en clair (bouton œil). */
+  readonly mdpVisible = signal(false);
 
   constructor(private authService: AuthService, private router: Router) {}
 

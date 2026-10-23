@@ -115,9 +115,9 @@ const ANTI_DOUBLON_MS = 5000;
       @if (onglet() === 'rechercher') {
         <section class="recherche">
           <input class="champ" type="search" [ngModel]="terme()" (ngModelChange)="chercher($event)"
-                 placeholder="Nom ou prénom de l'invité" autocomplete="off" autofocus />
+                 placeholder="Nom, prénom ou téléphone" autocomplete="off" autofocus />
           @if (rechercheEnCours()) { <p class="info">Recherche…</p> }
-          @else if (terme().trim().length >= 2 && resultats().length === 0) { <p class="info">Aucun invité confirmé à ce nom.</p> }
+          @else if (terme().trim().length >= 2 && resultats().length === 0) { <p class="info">Aucun invité confirmé ne correspond.</p> }
           <ul class="liste">
             @for (i of resultats(); track i.billetId) {
               @let reste = i.nbPlaces - i.nbEntreesScannees;
@@ -125,6 +125,7 @@ const ANTI_DOUBLON_MS = 5000;
                 <div class="personne">
                   <p class="personne-nom">{{ i.invite }}</p>
                   @if (i.nomConjoint) { <p class="personne-conjoint">+ {{ i.nomConjoint }}</p> }
+                  @if (i.telephone) { <p class="personne-tel">{{ i.telephone }}</p> }
                   @if (i.table) { <p class="personne-table">Table {{ i.table }}</p> }
                   <p class="personne-places" [class.complet]="reste <= 0">
                     {{ reste <= 0 ? 'Déjà entré' + (i.nbPlaces > 1 ? 's' : '') : reste + ' place' + (reste > 1 ? 's' : '') + ' restante' + (reste > 1 ? 's' : '') }}
@@ -220,7 +221,7 @@ const ANTI_DOUBLON_MS = 5000;
         radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--c-primaire) 55%, transparent), transparent 70%),
         linear-gradient(180deg, #2a3d57, var(--c-texte));
     }
-    .cadre--eteint video { visibility: hidden; }
+    .cadre--eteint video { opacity: 0; }
 
     /* fenêtre de visée : tout le reste est assombri */
     .fenetre {
@@ -346,6 +347,7 @@ const ANTI_DOUBLON_MS = 5000;
     .verdict-table strong { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 2.6rem; font-weight: 600; line-height: 1; color: var(--c-texte); }
     .verdict-table--aucune { background: rgba(255,255,255,.16); color: #fff; box-shadow: none; }
     .verdict-table--aucune strong { font-size: 1.3rem; color: #fff; font-family: Montserrat, system-ui, sans-serif; }
+    .personne-tel { font-size: .74rem; color: color-mix(in srgb, var(--c-texte) 60%, transparent); font-variant-numeric: tabular-nums; }
     .personne-table {
       display: inline-block; margin-top: .3rem; padding: .1rem .5rem; border-radius: 6px;
       background: color-mix(in srgb, var(--c-primaire) 14%, #fff); color: var(--c-primaire);
@@ -365,7 +367,14 @@ export class ScanComponent implements OnInit {
   readonly theme = inject(AdminThemeService);
 
   @ViewChild('video') set videoRef(ref: ElementRef<HTMLVideoElement> | undefined) {
-    this.video = ref?.nativeElement;
+    const nouvelle = ref?.nativeElement;
+    // En revenant sur l'onglet « Scanner », Angular recrée l'élément <video> :
+    // l'ancien lecteur filmerait dans une vidéo invisible (écran noir alors que le scan marche).
+    if (nouvelle !== this.video && this.lecteur) {
+      this.lecteur.destroy();
+      this.lecteur = null;
+    }
+    this.video = nouvelle;
     if (this.video && this.onglet() === 'scanner') this.demarrerCamera();
   }
   private video?: HTMLVideoElement;
@@ -426,7 +435,15 @@ export class ScanComponent implements OnInit {
     try {
       if (!this.lecteur) {
         const QrScanner = (await import('qr-scanner')).default;
-        this.lecteur = new QrScanner(this.video, r => this.surLecture(r.data), {
+        const video = this.video;
+        // Indispensable sur iPhone / certains Android pour afficher l'image dans la page
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('autoplay', '');
+        // La vidéo affiche des images : la caméra est bien active, quoi que dise start()
+        video.addEventListener('playing', () => { this.cameraActive.set(true); this.cameraErreur.set(null); });
+        this.lecteur = new QrScanner(video, r => this.surLecture(r.data), {
           preferredCamera: 'environment',
           maxScansPerSecond: 8,
           returnDetailedScanResult: true,
@@ -436,6 +453,8 @@ export class ScanComponent implements OnInit {
       this.cameraActive.set(true);
       this.flashDispo.set(await this.lecteur.hasFlash().catch(() => false));
     } catch (e) {
+      const filme = !!this.video && !this.video.paused && this.video.readyState >= 2;
+      if (filme) return;                     // erreur secondaire alors que l'image s'affiche : on l'ignore
       this.cameraActive.set(false);
       this.cameraErreur.set(this.expliquerErreurCamera(e));
     }

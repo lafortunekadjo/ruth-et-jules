@@ -32,8 +32,8 @@ export class RsvpService {
     return `/api/public/mariages/${slug}/rsvp`;
   }
 
-  identifier(slug: string, req: IdentificationRequest): Observable<IdentificationResponse> {
-    return this.http.post<IdentificationResponse>(`${this.baseUrl(slug)}/identifier`, req);
+  identifier(slug: string, demande: { nom?: string; prenom?: string; telephone?: string }): Observable<IdentificationResponse>{
+    return this.http.post<IdentificationResponse>(`${this.baseUrl(slug)}/identifier`, demande);
   }
 
   confirmerPresence(slug: string, rsvpSessionToken: string, present: boolean): Observable<RsvpResultResponse> {

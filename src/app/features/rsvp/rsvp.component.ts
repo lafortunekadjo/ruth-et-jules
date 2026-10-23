@@ -54,7 +54,7 @@ const DECORS_BILLET = [
 const LIEU = { nom: 'Les Palétuviers Matanda', ville: 'Douala', quartier: 'Bonassama' };
 
 /** Heure de la cérémonie si le backend n'en envoie pas. */
-const HEURE_PAR_DEFAUT = '11:00';
+const HEURE_PAR_DEFAUT = '14:00';
 
 /** Pétales du petit feu d'artifice à la confirmation. */
 const CONFETTIS = Array.from({ length: 18 }, (_, i) => {
@@ -114,18 +114,34 @@ const CONFETTIS = Array.from({ length: 18 }, (_, i) => {
           @case ('IDENTIFICATION') {
             <form class="etape" (ngSubmit)="identifier()">
               <h1>Confirmez votre présence</h1>
-              <p class="intro">Indiquez votre prénom et votre nom tels qu'ils figurent sur votre invitation.</p>
 
-              <label for="rsvp-prenom">Prénom</label>
-              <input id="rsvp-prenom" class="champ" name="prenom" [(ngModel)]="prenom"
-                     required maxlength="100" autocomplete="given-name" autocapitalize="words" enterkeyhint="next" />
+              <div class="mode-ident" role="tablist" aria-label="Me retrouver par">
+                <button type="button" role="tab" [class.actif]="modeIdent() === 'nom'" [attr.aria-selected]="modeIdent() === 'nom'"
+                        (click)="changerModeIdent('nom')">Par mon nom</button>
+                <button type="button" role="tab" [class.actif]="modeIdent() === 'telephone'" [attr.aria-selected]="modeIdent() === 'telephone'"
+                        (click)="changerModeIdent('telephone')">Par téléphone</button>
+              </div>
 
-              <label for="rsvp-nom">Nom</label>
-              <input id="rsvp-nom" class="champ" name="nom" [(ngModel)]="nom"
-                     required maxlength="100" autocomplete="family-name" autocapitalize="words" enterkeyhint="go" />
+              @if (modeIdent() === 'nom') {
+                <p class="intro">Indiquez votre prénom et votre nom tels qu'ils figurent sur votre invitation.</p>
+
+                <label for="rsvp-prenom">Prénom</label>
+                <input id="rsvp-prenom" class="champ" name="prenom" [(ngModel)]="prenom"
+                       required maxlength="100" autocomplete="given-name" autocapitalize="words" enterkeyhint="next" />
+
+                <label for="rsvp-nom">Nom</label>
+                <input id="rsvp-nom" class="champ" name="nom" [(ngModel)]="nom"
+                       required maxlength="100" autocomplete="family-name" autocapitalize="words" enterkeyhint="go" />
+              } @else {
+                <p class="intro">Indiquez le numéro de téléphone que les mariés ont enregistré pour vous.</p>
+
+                <label for="rsvp-tel">Numéro de téléphone</label>
+                <input id="rsvp-tel" class="champ" name="telephone" [(ngModel)]="telephone" type="tel" inputmode="tel"
+                       required maxlength="25" autocomplete="tel" placeholder="6 77 00 11 22" enterkeyhint="go" />
+              }
 
               @if (erreur()) { <p class="erreur" role="alert">{{ erreur() }}</p> }
-              <button type="submit" class="bouton" [disabled]="chargement() || !prenom().trim() || !nom().trim()">
+              <button type="submit" class="bouton" [disabled]="chargement() || !identificationPrete()">
                 @if (chargement()) { <span class="spinner" aria-hidden="true"></span> Recherche… } @else { Continuer }
               </button>
             </form>
@@ -321,6 +337,15 @@ const CONFETTIS = Array.from({ length: 18 }, (_, i) => {
 
     h1 { font-family: var(--affichage); font-size: 1.75rem; font-weight: 500; line-height: 1.2; margin-bottom: .5rem; }
     .intro { font-size: .92rem; color: var(--encre-douce); margin-bottom: 1.25rem; }
+    .mode-ident {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin: .25rem 0 1.1rem;
+      border-radius: 999px; background: color-mix(in srgb, var(--couleur-tertiaire) 22%, #fff);
+    }
+    .mode-ident button {
+      min-height: 40px; border: none; border-radius: 999px; background: none; cursor: pointer;
+      font: 600 .78rem var(--texte, Montserrat, sans-serif); color: var(--encre-douce); letter-spacing: .02em;
+    }
+    .mode-ident button.actif { background: #fff; color: var(--couleur-texte); box-shadow: 0 4px 12px -6px rgba(0,0,0,.25); }
 
     label { display: block; text-align: left; font-size: .75rem; font-weight: 600; letter-spacing: .04em; margin: 1rem 0 .35rem; color: var(--encre-douce); }
     .champ {
@@ -584,11 +609,29 @@ export class RsvpComponent implements OnInit {
 
   // ═══════════════ Parcours RSVP (logique inchangée) ═══════════════
 
+  /** Identification par nom (prénom + nom) ou par numéro de téléphone. */
+  readonly modeIdent = signal<'nom' | 'telephone'>('nom');
+  readonly telephone = signal('');
+
+  changerModeIdent(mode: 'nom' | 'telephone'): void {
+    this.modeIdent.set(mode);
+    this.erreur.set('');
+  }
+
+  identificationPrete(): boolean {
+    return this.modeIdent() === 'telephone'
+      ? this.telephone().replace(/\D/g, '').length >= 8
+      : !!this.prenom().trim() && !!this.nom().trim();
+  }
+
   identifier(): void {
     this.erreur.set('');
     this.chargement.set(true);
 
-    this.rsvpService.identifier(this.slug, { nom: this.nom().trim(), prenom: this.prenom().trim() })
+    const demande = this.modeIdent() === 'telephone'
+      ? { telephone: this.telephone().trim() }
+      : { nom: this.nom().trim(), prenom: this.prenom().trim() };
+    this.rsvpService.identifier(this.slug, demande)
       .subscribe({
         next: (res) => {
           this.identification.set(res);
@@ -596,9 +639,9 @@ export class RsvpComponent implements OnInit {
           this.chargement.set(false);
         },
         error: (err) => {
-          this.erreur.set(err?.status === 409
-            ? "Plusieurs invitations correspondent à ce nom. Merci de contacter les mariés directement."
-            : "Nous ne trouvons pas votre invitation. Vérifiez l'orthographe ou contactez les mariés.");
+          this.erreur.set(err?.error?.message ?? (err?.status === 409
+            ? "Plusieurs invitations correspondent. Merci de contacter les mariés directement."
+            : "Nous ne trouvons pas votre invitation. Vérifiez votre saisie ou contactez les mariés."));
           this.chargement.set(false);
         }
       });

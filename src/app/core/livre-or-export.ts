@@ -23,6 +23,8 @@ export interface ThemeExport {
   dateMariage?: string | null;
   /** Aquarelles du thème (facultatives) : celles du billet. */
   aquarelles?: { hautGauche?: string; basDroite?: string };
+  /** Musique de fond de la vidéo (la même que l'invitation). Facultative : sans elle, vidéo muette. */
+  musique?: string;
 }
 
 const S = "'Pinyon Script', 'Great Vibes', cursive";
@@ -233,14 +235,39 @@ export async function exporterVideoLivre(
   });
   const source = new mb.CanvasSource(canvas, { codec, bitrate: 6_000_000, keyFrameInterval: 2 });
   output.addVideoTrack(source, { frameRate: FPS });
-  await output.start();
 
   const total = tenues.reduce((a, b) => a + b, 0) + TOURNE * (pages.length - 1);
+
+  // ── Musique : préparée à la durée exacte de la vidéo, avec fondus ──
+  const musique = theme.musique ? await preparerMusique(theme.musique, total) : null;
+  let pisteSon: InstanceType<typeof mb.AudioBufferSource> | null = null;
+  if (musique) {
+    const codecSon = await mb.getFirstEncodableAudioCodec(mp4 ? ['aac', 'opus'] : ['opus', 'vorbis'],
+      { numberOfChannels: musique.numberOfChannels, sampleRate: musique.sampleRate });
+    if (codecSon) {
+      pisteSon = new mb.AudioBufferSource({ codec: codecSon, bitrate: 160_000 });
+      output.addAudioTrack(pisteSon);
+    }
+  }
+  await output.start();
+
+  // Le son est ajouté seconde par seconde, au rythme des images (multiplexage régulier)
+  let sonPose = 0;
+  const avancerSon = async (jusqua: number) => {
+    if (!pisteSon || !musique) return;
+    while (sonPose < Math.min(jusqua, total)) {
+      const fin = Math.min(sonPose + 1, total);
+      await pisteSon.add(extraire(musique, sonPose, fin));
+      sonPose = fin;
+    }
+  };
+
   let t = 0;
   const image = async (dessin: () => void) => {
     dessin();
     await source.add(t, 1 / FPS);
     t += 1 / FPS;
+    if (t - sonPose >= 1) await avancerSon(t);
     progression?.(Math.min(99, Math.round((t / total) * 100)));
   };
 
@@ -262,6 +289,7 @@ export async function exporterVideoLivre(
     }
   }
 
+  await avancerSon(total);
   await output.finalize();
   progression?.(100);
   const buffer = output.target.buffer!;
@@ -607,4 +635,50 @@ function alpha(hex: string, a: number): string {
 function melanger(a: string, b: string, t: number): string {
   const pa = rgb(a), pb = rgb(b);
   return '#' + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+
+// ═══════════════ Musique de la vidéo ═══════════════
+
+/**
+ * Charge le MP3, le met à la durée de la vidéo (boucle si la chanson est plus courte),
+ * avec un fondu d'entrée (2 s) et de sortie (4 s). Renvoie null si le fichier est absent ou illisible :
+ * la vidéo est alors simplement exportée sans son.
+ */
+async function preparerMusique(url: string, duree: number): Promise<AudioBuffer | null> {
+  try {
+    const rep = await fetch(url);
+    if (!rep.ok) return null;
+    const donnees = await rep.arrayBuffer();
+    const decodeur = new OfflineAudioContext(2, 44100, 44100);
+    const chanson = await decodeur.decodeAudioData(donnees);
+
+    const taux = 48000;
+    const rendu = new OfflineAudioContext(2, Math.ceil(duree * taux), taux);
+    const lecteur = rendu.createBufferSource();
+    lecteur.buffer = chanson;
+    lecteur.loop = chanson.duration < duree;
+    const volume = rendu.createGain();
+    const v = 0.8;
+    volume.gain.setValueAtTime(0, 0);
+    volume.gain.linearRampToValueAtTime(v, Math.min(2, duree / 4));
+    volume.gain.setValueAtTime(v, Math.max(0, duree - 4));
+    volume.gain.linearRampToValueAtTime(0, duree);
+    lecteur.connect(volume).connect(rendu.destination);
+    lecteur.start(0);
+    return await rendu.startRendering();
+  } catch {
+    return null;
+  }
+}
+
+/** Copie un morceau [debut, fin[ (en secondes) d'un AudioBuffer. */
+function extraire(source: AudioBuffer, debut: number, fin: number): AudioBuffer {
+  const taux = source.sampleRate;
+  const i0 = Math.floor(debut * taux);
+  const i1 = Math.min(source.length, Math.floor(fin * taux));
+  const morceau = new AudioBuffer({ numberOfChannels: source.numberOfChannels, length: Math.max(1, i1 - i0), sampleRate: taux });
+  for (let c = 0; c < source.numberOfChannels; c++) {
+    morceau.copyToChannel(source.getChannelData(c).subarray(i0, i1), c);
+  }
+  return morceau;
 }
