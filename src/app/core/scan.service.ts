@@ -24,6 +24,7 @@ export interface InviteRecherche {
   nbPlaces: number;
   nbEntreesScannees: number;
   table: string | null;
+  telephone: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
