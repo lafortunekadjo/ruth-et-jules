@@ -242,7 +242,10 @@ export async function exporterVideoLivre(
   const musique = theme.musique ? await preparerMusique(theme.musique, total) : null;
   let pisteSon: InstanceType<typeof mb.AudioBufferSource> | null = null;
   if (musique) {
-    const codecSon = await mb.getFirstEncodableAudioCodec(mp4 ? ['aac', 'opus'] : ['opus', 'vorbis'],
+    // MP4 → toujours de l'AAC : de l'Opus dans un MP4 est muet sur iPhone, WhatsApp, Windows…
+    // Si le navigateur ne sait pas encoder l'AAC (fréquent sous Windows), on charge un encodeur AAC.
+    if (mp4 && !(await mb.canEncodeAudio('aac').catch(() => false))) await activerEncodeurAac();
+    const codecSon = await mb.getFirstEncodableAudioCodec(mp4 ? ['aac'] : ['opus', 'vorbis'],
       { numberOfChannels: musique.numberOfChannels, sampleRate: musique.sampleRate });
     if (codecSon) {
       pisteSon = new mb.AudioBufferSource({ codec: codecSon, bitrate: 160_000 });
@@ -639,6 +642,19 @@ function melanger(a: string, b: string, t: number): string {
 
 // ═══════════════ Musique de la vidéo ═══════════════
 
+let encodeurAacActif = false;
+/** Encodeur AAC de secours (npm i @mediabunny/aac-encoder@1.61.2), chargé seulement si nécessaire. */
+async function activerEncodeurAac(): Promise<void> {
+  if (encodeurAacActif) return;
+  try {
+    const { registerAacEncoder } = await import('@mediabunny/aac-encoder');
+    registerAacEncoder();
+    encodeurAacActif = true;
+  } catch {
+    console.warn("[livre d'or] encodeur AAC indisponible : la vidéo sera muette");
+  }
+}
+
 /**
  * Charge le MP3, le met à la durée de la vidéo (boucle si la chanson est plus courte),
  * avec un fondu d'entrée (2 s) et de sortie (4 s). Renvoie null si le fichier est absent ou illisible :
@@ -658,16 +674,37 @@ async function preparerMusique(url: string, duree: number): Promise<AudioBuffer 
     lecteur.buffer = chanson;
     lecteur.loop = chanson.duration < duree;
     const volume = rendu.createGain();
-    const v = 0.8;
+    const v = 1;
     volume.gain.setValueAtTime(0, 0);
     volume.gain.linearRampToValueAtTime(v, Math.min(2, duree / 4));
     volume.gain.setValueAtTime(v, Math.max(0, duree - 4));
     volume.gain.linearRampToValueAtTime(0, duree);
     lecteur.connect(volume).connect(rendu.destination);
     lecteur.start(0);
-    return await rendu.startRendering();
+    const resultat = await rendu.startRendering();
+    normaliser(resultat);
+    return resultat;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Remonte le volume pour que le passage le plus fort atteigne ~ -1 dB :
+ * un MP3 enregistré bas reste ainsi bien audible dans la vidéo (gain limité à ×8).
+ */
+function normaliser(buffer: AudioBuffer): void {
+  let crete = 0;
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const d = buffer.getChannelData(c);
+    for (let i = 0; i < d.length; i++) { const a = Math.abs(d[i]); if (a > crete) crete = a; }
+  }
+  if (crete < 1e-4) return;                       // silence : rien à faire
+  const gain = Math.min(8, 0.89 / crete);
+  if (Math.abs(gain - 1) < 0.02) return;
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const d = buffer.getChannelData(c);
+    for (let i = 0; i < d.length; i++) d[i] *= gain;
   }
 }
 

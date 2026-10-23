@@ -8,10 +8,11 @@ import { SignatureStudioComponent } from '../../../shared/admin/signature-studio
 import { MessageExport, ThemeExport, dureeVideo, exporterLivrePdf, exporterVideoLivre } from '../../../core/livre-or-export';
 
 /**
- * Aquarelles utilisées dans les exports (couverture et dernière page).
- * ⚠ Mets le chemin de TON dossier d'images du mariage (le même que dans save-the-date).
+ * Dossier des images et de la musique du mariage, utilisé par les exports
+ * (aquarelles de la couverture et de la dernière page, musique de la vidéo).
+ * ⚠ Le même dossier que dans save-the-date.
  */
-const DOSSIER_AQUARELLES = (slug: string) => `assets/mariages/mireille-rodrigue`;
+const DOSSIER_MARIAGE = 'assets/mariages/mireille-rodrigue';
 
 type Filtre = 'tous' | 'attente' | 'publies' | 'rejetes';
 
@@ -365,20 +366,20 @@ export class LivreOrAdminComponent implements OnInit {
     this.selection.set(new Set(oui ? this.publies().map(m => m.id) : []));
   }
 
-  /** Sans les infos du mariage, la couverture serait vide : on prévient au lieu d'exporter. */
- /** Charge le mariage si besoin ; sans lui, la couverture serait vide. */
-private async mariagePret(): Promise<boolean> {
-  if (this.theme.mariage()?.nomsCouple) return true;
-  try {
-    await this.theme.chargerMariageCourant();
-  } catch { /* géré juste en dessous */ }
-  if (this.theme.mariage()?.nomsCouple) return true;
-  this.erreur.set("Impossible de charger les informations du mariage (noms, date). Vérifiez /api/admin/mariage/courant.");
-  return false;
-}
+  /** Charge le mariage si besoin ; sans lui, la couverture serait vide. */
+  private async mariagePret(): Promise<boolean> {
+    if (this.theme.mariage()?.nomsCouple) return true;
+    try {
+      await this.theme.chargerMariageCourant();
+    } catch { /* géré juste en dessous */ }
+    if (this.theme.mariage()?.nomsCouple) return true;
+    this.erreur.set("Impossible de charger les informations du mariage (noms, date). Vérifiez /api/admin/mariage/courant.");
+    return false;
+  }
+
   async genererPdf(): Promise<void> {
     this.erreur.set(null);
-    if (!this.mariagePret()) return;
+    if (!(await this.mariagePret())) return;
     this.pdfProgression.set(0);
     try {
       const blob = await exporterLivrePdf(this.versExport(this.publies()), this.themeExport(), p => this.pdfProgression.set(p));
@@ -392,7 +393,7 @@ private async mariagePret(): Promise<boolean> {
 
   async genererVideo(): Promise<void> {
     this.erreur.set(null);
-    if (!this.mariagePret()) return;
+    if (!(await this.mariagePret())) return;
     this.videoProgression.set(0);
     try {
       const choisis = this.publies().filter(m => this.selection().has(m.id));
@@ -414,7 +415,7 @@ private async mariagePret(): Promise<boolean> {
     const css = getComputedStyle(document.documentElement);
     const v = (nom: string, defaut: string) => css.getPropertyValue(nom).trim() || defaut;
     const m = this.theme.mariage();
-    const dossier = m?.slug ? DOSSIER_AQUARELLES(m.slug) : null;
+    const dossier = DOSSIER_MARIAGE;
     return {
       primaire: v('--couleur-primaire', '#5e86ae'),
       secondaire: v('--couleur-secondaire', '#c65a2a'),
@@ -424,9 +425,8 @@ private async mariagePret(): Promise<boolean> {
       nomsCouple: m?.nomsCouple ?? '',
       monogramme: this.theme.monogramme(),
       dateMariage: m?.dateMariage ?? null,
-      aquarelles: dossier
-        ? { hautGauche: `${dossier}/fleurs-haut-gauche.webp`, basDroite: `${dossier}/fleurs-bas-droite.webp` }
-        : undefined,
+      aquarelles: { hautGauche: `${dossier}/fleurs-haut-gauche.webp`, basDroite: `${dossier}/fleurs-bas-droite.webp` },
+      musique: `${dossier}/musique.mp3`,
     };
   }
 
