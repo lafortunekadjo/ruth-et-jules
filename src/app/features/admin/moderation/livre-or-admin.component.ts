@@ -426,7 +426,7 @@ export class LivreOrAdminComponent implements OnInit {
       monogramme: this.theme.monogramme(),
       dateMariage: m?.dateMariage ?? null,
       aquarelles: { hautGauche: `${dossier}/fleurs-haut-gauche.webp`, basDroite: `${dossier}/fleurs-bas-droite.webp` },
-      musique: `${dossier}/musique.mp3`,
+      musique: `${dossier}/musique.m4a`,
     };
   }
 

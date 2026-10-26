@@ -202,6 +202,14 @@ const LIBELLE_MOYEN: Record<MoyenPaiement, string> = {
                     }
                   }
                 </div>
+
+                @if (lienSur(item.lien); as url) {
+                  <a class="payer" [href]="url" target="_blank" rel="noopener noreferrer"
+                     [attr.aria-label]="libelleLienPaiement(url) + ' (nouvel onglet)'">
+                    {{ libelleLienPaiement(url) }}
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+                  </a>
+                }
               </article>
             }
           </div>
@@ -406,6 +414,17 @@ const LIBELLE_MOYEN: Record<MoyenPaiement, string> = {
       transition: background 200ms ease, color 200ms ease;
     }
     .copier:hover { background: color-mix(in srgb, var(--couleur-tertiaire) 15%, #fff); }
+    /* Lien de paiement (PayPal.me, Lydia, cagnotte…) */
+    .payer {
+      display: flex; align-items: center; justify-content: center; gap: .5rem;
+      margin-top: 1.1rem; min-height: 46px; padding: 0 1.2rem; border-radius: 999px;
+      background: var(--couleur-secondaire); color: #fff; text-decoration: none;
+      font-family: var(--texte); font-size: .68rem; font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
+      box-shadow: 0 10px 22px -14px color-mix(in srgb, var(--couleur-secondaire) 80%, transparent);
+      transition: filter 200ms ease, transform 200ms ease;
+    }
+    .payer:hover, .payer:focus-visible { filter: brightness(1.08); transform: translateY(-1px); }
+    .payer svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     .copier svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; }
     @media (max-width: 400px) {
       .contribution { padding-left: 1.1rem; padding-right: 1.1rem; }
@@ -626,6 +645,16 @@ export class PublicWishlistComponent implements OnInit {
   /** « https://www.jumia.cm/produit… » → « jumia.cm » */
   domaine(url: string): string {
     try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'le site'; }
+  }
+
+  /** Texte du bouton de paiement : « Participer via PayPal », sinon le nom du site. */
+  libelleLienPaiement(url: string): string {
+    const d = this.domaine(url);
+    if (/paypal\./i.test(d)) return 'Participer via PayPal';
+    if (/lydia/i.test(d)) return 'Participer via Lydia';
+    if (/leetchi/i.test(d)) return 'Participer via Leetchi';
+    if (/wave\./i.test(d)) return 'Participer via Wave';
+    return `Participer via ${d}`;
   }
 
   formaterPrix(prix: number | string): string {
