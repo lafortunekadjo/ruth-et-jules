@@ -69,6 +69,12 @@ const INSPIRATIONS = [
   { src: `${DOSSIER_PHOTOS}/inspirations/palette-elegance-cotiere.webp`, alt: 'Guide de palette Élégance Côtière' },
 ];
 
+/**
+ * Noms de famille affichés sous les prénoms, sur l'écran d'ouverture (Cormorant Garamond, majuscules).
+ * Laisser '' pour ne rien afficher sous un prénom.
+ */
+const NOMS_FAMILLE: [string, string] = ['Ekoka', 'MOUKOKO'];
+
 /** Photo de fond de l'écran d'ouverture (fondue dans un cercle). */
 const PHOTO_OUVERTURE = PHOTOS.sourires;
 
@@ -285,6 +291,7 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
 
               <h1 class="ouv-noms">
                 <span class="ouv-prenom ouv-prenom--1">{{ prenoms()[0] }}</span>
+                @if (nomsFamille[0]) { <span class="ouv-nom ouv-nom--1">{{ nomsFamille[0] }}</span> }
                 @if (prenoms()[1]) {
                   <svg class="anneaux" viewBox="0 0 64 34" aria-hidden="true">
                     <path class="anneaux-feuille" d="M6 20 C10 12 16 12 18 16 C14 20 10 21 6 20Z M58 20 C54 12 48 12 46 16 C50 20 54 21 58 20Z"/>
@@ -293,6 +300,7 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
                     <path class="anneaux-pierre" d="M23 7.5 L26 4 L29 7.5 L26 10Z"/>
                   </svg>
                   <span class="ouv-prenom ouv-prenom--2">{{ prenoms()[1] }}</span>
+                  @if (nomsFamille[1]) { <span class="ouv-nom ouv-nom--2">{{ nomsFamille[1] }}</span> }
                 }
               </h1>
 
@@ -1124,6 +1132,27 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
     .ouv-prenom--2 { animation-delay: 2.1s; }
     @keyframes ecrire { to { clip-path: inset(-40% -15% -40% -15%); } }
 
+    /* Nom de famille : capitales romaines sous le prénom calligraphié */
+    .ouv-nom {
+      display: block;
+      margin-top: -.15em;
+      padding-left: .22em;                         /* compense l'espacement de la dernière lettre */
+      font-family: var(--affichage);
+      font-weight: 400;
+      font-size: clamp(1.7rem, 8vw, 3.4rem);
+      line-height: 1.05;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      background: var(--bronze);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--couleur-texte) 18%, transparent));
+      opacity: 0;
+      animation: nom-apparait 1s ease forwards;
+    }
+    .ouv-nom--1 { animation-delay: 1.9s; }
+    .ouv-nom--2 { animation-delay: 3.4s; }
+    @keyframes nom-apparait { from { opacity: 0; transform: translateY(6px); letter-spacing: .4em; } to { opacity: 1; transform: none; letter-spacing: .22em; } }
+
     .anneaux {
       width: 62px; height: 34px;
       margin: .1rem 0;
@@ -1803,7 +1832,7 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
       [data-reveal] { opacity: 1; transform: none; }
-      .cal-jour, .ouv-prenom, .anneaux, .ouv-date, .ouv-defiler, .ouv-filet span, .ouv-filet svg { opacity: 1; clip-path: none; transform: none; }
+      .cal-jour, .ouv-prenom, .ouv-nom, .anneaux, .ouv-date, .ouv-defiler, .ouv-filet span, .ouv-filet svg { opacity: 1; clip-path: none; transform: none; }
       .papillons { display: none; }
       .pastille { transform: none; }
       .petales { display: none; }
@@ -1876,6 +1905,8 @@ export class SaveTheDateComponent implements OnInit {
   readonly illustration = ILLUSTRATION;
   readonly photoOuverture = PHOTO_OUVERTURE;
   readonly papillons = PAPILLONS;
+
+  readonly nomsFamille = NOMS_FAMILLE;
 
   /** "Mireille & Rodrigue" → ["Mireille", "Rodrigue"] */
   readonly prenoms = computed<[string, string]>(() => {
