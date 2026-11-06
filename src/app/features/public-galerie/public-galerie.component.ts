@@ -59,7 +59,7 @@ const POIDS_MAX_VIDEO_AVANT = 500 * 1024 * 1024;
 
       <section class="titre-page">
         <p class="surtitre">Nos souvenirs</p>
-        <h1>Partage photo</h1>
+        <h1>Partage photo</h1> 
         <p class="intro">Vous avez pris de belles photos ? Partagez-les avec nous : elles apparaîtront ici une fois validées.</p>
       </section>
 
