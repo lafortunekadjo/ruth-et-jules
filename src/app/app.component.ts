@@ -6,7 +6,7 @@ import { BarreInvitesComponent } from './shared/barre-invites.component';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, BoutonMusiqueComponent],
+  imports: [RouterOutlet, BoutonMusiqueComponent,BarreInvitesComponent],
   template: `<router-outlet /> <app-bouton-musique /> <app-barre-invites />`,
 })
 export class AppComponent {}
