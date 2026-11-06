@@ -333,6 +333,35 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
             </button>
           </section>
 
+
+          <!-- Raccourcis invités : liste de cadeaux, partage photo, livre d'or -->
+          <ng-template #raccourcis let-m>
+            <nav class="raccourcis" aria-label="Pour les invités">
+              @if (m.wishlistActive) {
+                <a class="raccourci" [routerLink]="['/m', m.slug, 'wishlist']">
+                  <span class="raccourci-icone" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M20 12v9H4v-9M2.5 7h19v5h-19zM12 21V7M12 7C10 3 6 3 6 5.5S9 7 12 7zM12 7c2-4 6-4 6-1.5S15 7 12 7z"/></svg>
+                  </span>
+                  <span class="raccourci-texte">Liste de cadeaux</span>
+                </a>
+              }
+              @if (m.galeriePhotoActive) {
+                <a class="raccourci" [routerLink]="['/m', m.slug, 'photos']">
+                  <span class="raccourci-icone" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M4 8h3l1.6-2.4A1.5 1.5 0 0 1 9.8 5h4.4a1.5 1.5 0 0 1 1.2.6L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>
+                  </span>
+                  <span class="raccourci-texte">Partage photo</span>
+                </a>
+              }
+              <a class="raccourci" [routerLink]="['/m', m.slug, 'livre-or']">
+                <span class="raccourci-icone" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/><path d="M7 8h1.5M7 11h1.5M15.5 8H17M15.5 11H17"/></svg>
+                </span>
+                <span class="raccourci-texte">Livre d'or</span>
+              </a>
+            </nav>
+          </ng-template>
+
           <!-- ───── CARTE SAVE THE DATE (calendrier) ───── -->
           <section class="std" id="haut">
             <div class="petales" aria-hidden="true">
@@ -474,6 +503,10 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
                   Ajouter à mon agenda
                 </button>
               }
+            </div>
+
+            <div class="raccourcis-haut" data-reveal>
+              <ng-container *ngTemplateOutlet="raccourcis; context: { $implicit: m }" />
             </div>
 
             @if (compte(); as c) {
@@ -685,15 +718,7 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
             <p class="invitation-texte">Nous serions heureux de vous compter parmi nous.</p>
             <a [routerLink]="['/m', m.slug, 'rsvp']" class="bouton bouton--plein bouton--reflet">Confirmer ma présence</a>
 
-            <div class="liens-secondaires">
-              @if (m.wishlistActive) {
-                <a [routerLink]="['/m', m.slug, 'wishlist']">Liste de mariage</a>
-              }
-              @if (m.galeriePhotoActive) {
-                <a [routerLink]="['/m', m.slug, 'photos']">Galerie photo</a>
-              }
-              <a [routerLink]="['/m', m.slug, 'livre-or']">Livre d'or</a>
-            </div>
+            <ng-container *ngTemplateOutlet="raccourcis; context: { $implicit: m }" />
           </section>
 
           <footer class="pied">
@@ -707,9 +732,23 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
 
           <!-- ───── Barre RSVP collante (mobile) ───── -->
           <nav class="barre-rsvp" [class.visible]="barreVisible()" aria-label="Réservation">
-            <span class="barre-texte">
-              <span class="barre-mono">{{ monogramme(m) }}</span>
-              @if (m.dateMariage) { <span class="barre-date">{{ dateCourte(m.dateMariage) }}</span> }
+            <span class="barre-liens">
+              @if (m.wishlistActive) {
+                <a class="barre-lien" [routerLink]="['/m', m.slug, 'wishlist']" aria-label="Liste de cadeaux">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9M2.5 7h19v5h-19zM12 21V7M12 7C10 3 6 3 6 5.5S9 7 12 7zM12 7c2-4 6-4 6-1.5S15 7 12 7z"/></svg>
+                  <span>Cadeaux</span>
+                </a>
+              }
+              @if (m.galeriePhotoActive) {
+                <a class="barre-lien" [routerLink]="['/m', m.slug, 'photos']" aria-label="Partage photo">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.6-2.4A1.5 1.5 0 0 1 9.8 5h4.4a1.5 1.5 0 0 1 1.2.6L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>
+                  <span>Photos</span>
+                </a>
+              }
+              <a class="barre-lien" [routerLink]="['/m', m.slug, 'livre-or']" aria-label="Livre d'or">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>
+                <span>Livre d'or</span>
+              </a>
             </span>
             <a [routerLink]="['/m', m.slug, 'rsvp']" class="bouton bouton--plein bouton--compact">Je confirme</a>
           </nav>
@@ -1767,11 +1806,49 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
     }
     .barre-rsvp.visible { transform: none; }
     .barre-texte { display: flex; flex-direction: column; line-height: 1.2; }
+    .barre-liens { display: flex; align-items: center; gap: .15rem; min-width: 0; }
+    .barre-lien {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .15rem;
+      min-width: 52px; min-height: 46px; padding: 0 .3rem; border-radius: 12px;
+      color: var(--couleur-primaire); text-decoration: none;
+      font-size: .58rem; font-weight: 600; letter-spacing: .06em; white-space: nowrap;
+      transition: background 200ms ease;
+    }
+    .barre-lien svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .barre-lien:active, .barre-lien:focus-visible { background: color-mix(in srgb, var(--couleur-primaire) 10%, transparent); }
+
+    /* Raccourcis invités (sous la carte et dans l'appel final) */
+    .raccourcis-haut { margin-top: 1.6rem; }
+    .raccourcis {
+      display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+      gap: .6rem; width: 100%; max-width: 460px; margin: 0 auto;
+    }
+    .raccourci {
+      display: flex; flex-direction: column; align-items: center; gap: .55rem;
+      padding: .95rem .4rem .85rem; border-radius: 18px;
+      background: color-mix(in srgb, #fff 70%, var(--couleur-fond));
+      border: 1px solid var(--bordure);
+      box-shadow: 0 10px 24px -18px color-mix(in srgb, var(--couleur-texte) 45%, transparent);
+      color: var(--couleur-texte); text-decoration: none; text-align: center;
+      transition: transform 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
+    }
+    .raccourci-icone {
+      width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center;
+      background: color-mix(in srgb, var(--couleur-primaire) 12%, #fff);
+      color: var(--couleur-primaire);
+    }
+    .raccourci-icone svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .raccourci-texte { font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; line-height: 1.3; }
+    .raccourci:active { transform: scale(.97); }
+    .appel .raccourcis { margin-top: 1.6rem; }
     .barre-mono { font-family: var(--police-script); font-size: 1.5rem; color: var(--couleur-primaire); }
     .barre-date { font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; color: var(--encre-douce); }
 
     /* ════════════ PETITS ÉCRANS (≤ 360 px) ════════════ */
     @media (max-width: 360px) {
+      .barre-lien { min-width: 44px; padding: 0 .15rem; }
+      .barre-lien span { font-size: .52rem; letter-spacing: .02em; }
+      .raccourci-texte { font-size: .62rem; letter-spacing: .04em; }
       .std-titre { font-size: 2.6rem; }
       .std-noms { font-size: 2rem; }
       .cal-jour { height: 32px; font-size: .9rem; }
@@ -1827,6 +1904,8 @@ const PETALES = Array.from({ length: 9 }, (_, i) => ({
       .bouton--plein:hover { transform: translateY(-2px); box-shadow: 0 12px 28px color-mix(in srgb, var(--couleur-secondaire) 40%, transparent); }
       .carte-lien:hover .carte-fond { transform: scale(1.04); transition: transform 1.2s ease; }
       .liens-secondaires a:hover { opacity: 1; color: var(--couleur-primaire); }
+      .raccourci:hover { transform: translateY(-3px); border-color: var(--couleur-primaire); box-shadow: 0 16px 30px -18px color-mix(in srgb, var(--couleur-texte) 55%, transparent); }
+      .barre-lien:hover { background: color-mix(in srgb, var(--couleur-primaire) 10%, transparent); }
     }
 
     @media (prefers-reduced-motion: reduce) {
