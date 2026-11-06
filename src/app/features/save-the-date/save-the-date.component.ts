@@ -106,7 +106,7 @@ const HEURE_PAR_DEFAUT = '11:00';
 const DEROULE: { heure: string; titre: string; detail?: string }[] = [
   { heure: '10h30', titre: 'Accueil des invités' },
   { heure: '11h00', titre: 'Cérémonie de mariage' },
-  { heure: '13h00', titre: "Vin d'honneur" },
+  { heure: '13h00', titre: "Cocktail dînatoire" },
   { heure: '17h00', titre: 'Coupure du gâteau' },
 ];
 
