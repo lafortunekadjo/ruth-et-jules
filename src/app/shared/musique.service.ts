@@ -6,7 +6,7 @@ const CLE = 'musique-invitation';
 /**
  * Musique de fond de l'invitation, partagée par toutes les pages invités.
  * Le service vit tant que l'onglet est ouvert : la musique continue quand on passe
- * de l'invitation à la liste de mariage, à la galerie, au livre d'or ou au RSVP.
+ * de l'invitation à la liste de cadeaux, au partage photo, au livre d'or ou au RSVP.
  */
 @Injectable({ providedIn: 'root' })
 export class MusiqueService {
@@ -46,7 +46,12 @@ export class MusiqueService {
       this.audio.loop = true;
       this.audio.preload = 'auto';
       this.audio.addEventListener('playing', () => this.joue.set(true));
-      this.audio.addEventListener('pause', () => { if (!this.document.hidden) this.joue.set(false); });
+      this.audio.addEventListener('pause', () => {
+        // Une pause « de fin de piste » (certains navigateurs) n'est pas une coupure de l'invité
+        if (!this.document.hidden && !this.audio?.ended) this.joue.set(false);
+      });
+      // Filet de sécurité : si la boucle native ne se déclenche pas (iPhone, certains .m4a), on relance.
+      this.audio.addEventListener('ended', () => this.reprendreDuDebut());
     }
     this.coupee.set(false);
     this.audio.volume = 0;
@@ -68,6 +73,14 @@ export class MusiqueService {
 
   basculer(): void {
     if (this.joue()) this.couper(); else this.jouer();
+  }
+
+  /** Musique terminée : repart du début, sauf si l'invité a coupé le son. */
+  private reprendreDuDebut(): void {
+    const a = this.audio;
+    if (!a || this.coupee()) return;
+    a.currentTime = 0;
+    a.play().catch(() => this.joue.set(false));
   }
 
   private installerEcouteurs(relancerAuToucher: boolean): void {
