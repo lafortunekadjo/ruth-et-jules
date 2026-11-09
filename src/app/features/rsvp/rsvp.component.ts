@@ -34,7 +34,7 @@ const HEX = /^#([0-9a-f]{6})$/i;
 
 /** Format du billet : portrait 2:3 (1080×1620), celui de la maquette. */
 const BILLET_L = 1080;
-const BILLET_H = 1620;
+const BILLET_H = 1620; 
 
 /**
  * Aquarelles du billet, propres à CE mariage : public/mariages/mireille-rodrigue/billet/
