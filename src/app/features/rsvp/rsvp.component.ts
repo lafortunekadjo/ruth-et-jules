@@ -41,7 +41,7 @@ const BILLET_H = 1620;
  * x, y, l, h = position et taille dans la maquette 1024×1536 (mises à l'échelle au dessin).
  * Si un fichier manque, le billet est généré sans lui.
  */
-const DOSSIER_BILLET = '/mariages/mireille-rodrigue/billet';
+const DOSSIER_BILLET = '/mariages/mireille-rodrigue';
 const DECORS_BILLET = [
   { fichier: 'plage-bas-gauche.webp', x: 44, y: 1183, l: 316, h: 317 },
   { fichier: 'plage-droite.webp', x: 853, y: 715, l: 137, h: 115 },
