@@ -54,7 +54,7 @@ const DECORS_BILLET = [
 const LIEU = { nom: 'Les Palétuviers Matanda', ville: 'Douala', quartier: 'Bonassama' };
 
 /** Heure de la cérémonie si le backend n'en envoie pas. */
-const HEURE_PAR_DEFAUT = '14:00';
+const HEURE_PAR_DEFAUT = '11:00';
 
 /** Pétales du petit feu d'artifice à la confirmation. */
 const CONFETTIS = Array.from({ length: 18 }, (_, i) => {
